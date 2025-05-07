@@ -19,8 +19,16 @@ const images = {
     walk1: new Image(),
     walk2: new Image(),
     jump: new Image(),
-    background: new Image(),
-    bricks1: new Image(), // Brick images
+    // background: new Image(), // We'll replace this single background
+    bg1: new Image(), // New background images
+    bg2: new Image(),
+    bg3: new Image(),
+    bg4: new Image(),
+    bg5: new Image(),
+    bg6: new Image(),
+    bg7: new Image(),
+    bg8: new Image(),
+    bricks1: new Image(),
     bricks2: new Image(),
     bricks3: new Image(),
     bricks4: new Image(),
@@ -31,13 +39,24 @@ const imageSources = {
     walk1: 'assets/robot_walk_pos_1.png',
     walk2: 'assets/robot_walk_pos_2.png',
     jump: 'assets/robot_jump.png',
-    background: 'assets/platform_bg.png',
-    bricks1: 'assets/bricks1.png', // Brick image sources
+    // background: 'assets/platform_bg.png', // Remove old single background
+    bg1: 'assets/platform_bg1.png', // Add new background image sources
+    bg2: 'assets/platform_bg2.png',
+    bg3: 'assets/platform_bg3.png',
+    bg4: 'assets/platform_bg4.png',
+    bg5: 'assets/platform_bg5.png',
+    bg6: 'assets/platform_bg6.png',
+    bg7: 'assets/platform_bg7.png',
+    bg8: 'assets/platform_bg8.png',
+    bricks1: 'assets/bricks1.png',
     bricks2: 'assets/bricks2.png',
     bricks3: 'assets/bricks3.png',
     bricks4: 'assets/bricks4.png',
     bricks5: 'assets/bricks5.png'
 };
+
+// The rest of your image loading logic (imagesToLoad, imagesActuallyLoaded, onImageLoad, for loop)
+// will automatically pick these up.
 
 let imagesToLoad = Object.keys(imageSources).length;
 let imagesActuallyLoaded = 0;
