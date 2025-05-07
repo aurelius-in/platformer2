@@ -6,10 +6,12 @@ canvas.width = 800;
 canvas.height = 400;
 
 const gravity = 0.5;
-const jumpForce = 9; // Adjusted
+const jumpForce = 9;
 const playerSpeed = 5;
-const scrollSpeed = 1;
+// const scrollSpeed = 1; // REMOVED - Replaced by camera movement
 const PLAYER_SPRITE_SCALE = 0.25;
+
+console.log("Script started. Canvas initialized.");
 
 // Image Loading
 const images = {
@@ -17,56 +19,73 @@ const images = {
     walk1: new Image(),
     walk2: new Image(),
     jump: new Image(),
-    background: new Image()
+    background: new Image(),
+    bricks1: new Image(), // Brick images
+    bricks2: new Image(),
+    bricks3: new Image(),
+    bricks4: new Image(),
+    bricks5: new Image()
 };
 const imageSources = {
     stand: 'assets/robot_stand.png',
     walk1: 'assets/robot_walk_pos_1.png',
     walk2: 'assets/robot_walk_pos_2.png',
     jump: 'assets/robot_jump.png',
-    background: 'assets/platform_bg.png'
+    background: 'assets/platform_bg.png',
+    bricks1: 'assets/bricks1.png', // Brick image sources
+    bricks2: 'assets/bricks2.png',
+    bricks3: 'assets/bricks3.png',
+    bricks4: 'assets/bricks4.png',
+    bricks5: 'assets/bricks5.png'
 };
 
 let imagesToLoad = Object.keys(imageSources).length;
 let imagesActuallyLoaded = 0;
+console.log("Total images to load:", imagesToLoad);
 
-// Background Scrolling Variables
-let bgX = 0;
+// Camera variables
+let cameraX = 0;
+let cameraY = 0; // We'll keep cameraY fixed at 0 for now (no vertical scrolling)
+
+// Background Scrolling Variables (relative to world)
 let bgImageWidth = 0;
 const BG_ASPECT_RATIO = 3 / 1;
 
-function onImageLoad() {
+function onImageLoad(imageKey) {
     imagesActuallyLoaded++;
+    console.log(`Image loaded (${imageKey}). ${imagesActuallyLoaded}/${imagesToLoad} images loaded so far.`);
+    // console.log(`  Details for ${imageKey}: complete=${images[imageKey].complete}, naturalWidth=${images[imageKey].naturalWidth}, naturalHeight=${images[imageKey].naturalHeight}`);
+
     if (imagesActuallyLoaded === imagesToLoad) {
-        // *** ADDED: Calculate bgImageWidth here ***
+        console.log("All images reported as loaded/processed.");
         if (images.background.complete && images.background.naturalHeight > 0) {
             bgImageWidth = canvas.height * BG_ASPECT_RATIO;
+            console.log("SUCCESS: Background image dimensions appear valid. Calculated bgImageWidth:", bgImageWidth);
         } else {
-            // Fallback or error if background image didn't load its dimensions properly
-            console.error("Background image dimensions not available for calculating width.");
-            bgImageWidth = canvas.width; // A fallback, though not ideal for 3:1 ratio
+            console.error("ERROR: Background image not complete or naturalHeight is 0 when trying to calculate bgImageWidth.");
         }
-
         initializePlayerSprite();
-        generateInitialPlatforms();
+        generateInitialPlatforms(); // Generate platforms based on initial cameraX (0)
+        console.log("Starting gameLoop...");
         gameLoop();
     }
 }
 
 for (const key in imageSources) {
-    images[key].onload = onImageLoad;
+    // console.log("Setting up image:", key, "with source:", imageSources[key]); // Can be noisy
+    images[key].onload = () => onImageLoad(key);
+    images[key].onerror = function() {
+        console.error(`ERROR: Failed to load image with key: ${key}, source: ${this.src}`);
+        if (key === 'background') console.error("CRITICAL: BACKGROUND IMAGE FAILED TO LOAD.");
+        onImageLoad(key);
+    };
     images[key].src = imageSources[key];
-    images[key].onerror = () => {
-        console.error(`Failed to load image: ${imageSources[key]}`);
-        // Call onImageLoad anyway to not stall the game if one image fails,
-        // but background might be missing or fallback might be used.
-        onImageLoad();
-    }
 }
 
+// Player (x, y are now world coordinates)
 const player = {
-    x: 50,
-    y: canvas.height - 70,
+    x: 50, // World X
+    y: canvas.height - 70, // World Y
     width: 35,
     height: 55,
     dx: 0,
@@ -82,88 +101,116 @@ const player = {
 };
 
 function initializePlayerSprite() {
+    console.log("Initializing player sprite.");
     player.currentImage = images.stand;
 }
 
-const platformHeight = 20;
-const minPlatformWidthBlocks = 2;
-const maxPlatformWidthBlocks = 12;
+// Platform settings
+const platformHeight = 20; // This will also be the size of one brick sprite
+const minPlatformWidthBlocks = 3; // Min number of bricks for a platform
+const maxPlatformWidthBlocks = 10; // Max number of bricks
 const minPlatformGap = 80;
 const maxPlatformGap = 150;
-const minPlatformY = canvas.height - 150;
-const maxPlatformY = canvas.height - 40;
-let lastPlatformEndX = 0;
+const minPlatformY = canvas.height - 150; // World Y
+const maxPlatformY = canvas.height - 40;  // World Y
+let lastPlatformEndX = 0; // World X of the end of the last generated platform
 const platforms = [];
 
 function generateInitialPlatforms() {
     platforms.length = 0;
+    // Create a wider initial platform for the player to start on
+    const initialPlatformWidthInBlocks = 15;
     const initialPlatform = {
-        x: 0,
-        y: canvas.height - platformHeight - 20,
-        width: 300,
+        x: 0, // World X
+        y: canvas.height - platformHeight - 20, // World Y
+        width: initialPlatformWidthInBlocks * platformHeight,
         height: platformHeight,
-        color: 'saddlebrown'
+        numBricks: initialPlatformWidthInBlocks,
+        brickPattern: []
     };
+    for (let i = 0; i < initialPlatformWidthInBlocks; i++) {
+        const brickIndex = Math.floor(Math.random() * 5) + 1;
+        initialPlatform.brickPattern.push('bricks' + brickIndex);
+    }
     platforms.push(initialPlatform);
     lastPlatformEndX = initialPlatform.x + initialPlatform.width;
-    while (lastPlatformEndX < canvas.width + 200) {
+
+    // Generate more platforms to fill the initial view based on camera
+    while (lastPlatformEndX < cameraX + canvas.width + 200) {
         generateNewPlatform();
     }
 }
 
 function generateNewPlatform() {
     const gap = minPlatformGap + Math.random() * (maxPlatformGap - minPlatformGap);
-    const newPlatformX = lastPlatformEndX + gap;
+    const newPlatformX = lastPlatformEndX + gap; // World X
+
     const platformWidthInBlocks = Math.floor(Math.random() * (maxPlatformWidthBlocks - minPlatformWidthBlocks + 1)) + minPlatformWidthBlocks;
     const newPlatformWidth = platformWidthInBlocks * platformHeight;
-    let newPlatformY = minPlatformY + Math.random() * (maxPlatformY - minPlatformY);
+
+    let newPlatformY = minPlatformY + Math.random() * (maxPlatformY - minPlatformY); // World Y
     newPlatformY = Math.round(newPlatformY / platformHeight) * platformHeight;
-    platforms.push({
+
+    const newPlatform = {
         x: newPlatformX,
         y: newPlatformY,
         width: newPlatformWidth,
         height: platformHeight,
-        color: 'saddlebrown'
-    });
-    lastPlatformEndX = newPlatformX + newPlatformWidth;
+        numBricks: platformWidthInBlocks,
+        brickPattern: []
+    };
+    for (let i = 0; i < platformWidthInBlocks; i++) {
+        const brickIndex = Math.floor(Math.random() * 5) + 1; // 1 to 5
+        newPlatform.brickPattern.push('bricks' + brickIndex);
+    }
+    platforms.push(newPlatform);
+    lastPlatformEndX = newPlatformX + newPlatform.width;
 }
 
 const keys = { left: false, right: false, up: false };
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') keys.left = true;
-    if (e.key === 'ArrowRight') keys.right = true;
-    if (e.key === 'ArrowUp') keys.up = true;
-});
-document.addEventListener('keyup', (e) => {
-    if (e.key === 'ArrowLeft') keys.left = false;
-    if (e.key === 'ArrowRight') keys.right = false;
-    if (e.key === 'ArrowUp') keys.up = false;
-});
+document.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') keys.left = true; if (e.key === 'ArrowRight') keys.right = true; if (e.key === 'ArrowUp') keys.up = true; });
+document.addEventListener('keyup', (e) => { if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false; if (e.key === 'ArrowUp') keys.up = false; });
 
-// *** ADDED: drawBackground function ***
 function drawBackground() {
-    if (!images.background.complete || images.background.naturalHeight === 0 || bgImageWidth === 0) {
-        // Background image not ready, invalid, or width not calculated
-        // Draw solid blue as fallback if canvas has blue, or clear to canvas default
-        // The canvas already has a blue background from CSS, so clearRect will show it.
+    if (!images.background.complete || images.background.naturalHeight === 0 || bgImageWidth <= 0) {
         return;
     }
-    ctx.drawImage(images.background, bgX, 0, bgImageWidth, canvas.height);
-    ctx.drawImage(images.background, bgX + bgImageWidth, 0, bgImageWidth, canvas.height);
+    // Calculate the starting X position for drawing the background based on cameraX
+    // This creates a seamless loop.
+    const parallaxFactor = 1; // Set to < 1 for slower background scroll (parallax)
+    let effectiveCameraX = cameraX * parallaxFactor;
+    let startX = -(effectiveCameraX % bgImageWidth);
+    if (startX > 0) { // Ensure startX is 0 or negative for proper looping from left
+        startX -= bgImageWidth;
+    }
+
+    ctx.drawImage(images.background, startX, 0 - cameraY, bgImageWidth, canvas.height);
+    ctx.drawImage(images.background, startX + bgImageWidth, 0 - cameraY, bgImageWidth, canvas.height);
+    // Draw a third if necessary to cover screen during fast camera moves or very wide bgImageWidth
+    if (startX + bgImageWidth * 2 < canvas.width + effectiveCameraX ) { // Heuristic check
+         ctx.drawImage(images.background, startX + bgImageWidth * 2, 0 - cameraY, bgImageWidth, canvas.height);
+    }
 }
 
 function drawPlayer() {
     if (!player.currentImage || !player.currentImage.complete || player.currentImage.naturalHeight === 0) {
         ctx.fillStyle = 'purple';
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height);
         return;
     }
     ctx.save();
     const img = player.currentImage;
     const scaledSpriteWidth = img.naturalWidth * PLAYER_SPRITE_SCALE;
     const scaledSpriteHeight = img.naturalHeight * PLAYER_SPRITE_SCALE;
-    const drawX = player.x + (player.width / 2) - (scaledSpriteWidth / 2);
-    const drawY = player.y + player.height - scaledSpriteHeight;
+
+    // Player's collision box top-left on screen
+    const playerScreenX = player.x - cameraX;
+    const playerScreenY = player.y - cameraY;
+
+    // Position the scaled sprite relative to the collision box screen coordinates
+    const drawX = playerScreenX + (player.width / 2) - (scaledSpriteWidth / 2);
+    const drawY = playerScreenY + player.height - scaledSpriteHeight;
+
     if (player.facingDirection === 'right') {
         ctx.translate(drawX + scaledSpriteWidth / 2, drawY + scaledSpriteHeight / 2);
         ctx.scale(-1, 1);
@@ -172,43 +219,98 @@ function drawPlayer() {
         ctx.drawImage(img, drawX, drawY, scaledSpriteWidth, scaledSpriteHeight);
     }
     ctx.restore();
+
+    // Optional: Draw collision box for debugging (uses screen coordinates)
+    // ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+    // ctx.strokeRect(playerScreenX, playerScreenY, player.width, player.height);
 }
 
 function drawPlatforms() {
+    const brickSize = platformHeight; // Bricks are scaled to platformHeight
+
     platforms.forEach(platform => {
-        ctx.fillStyle = platform.color;
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+        // Calculate screen Y for the top of the platform
+        const platformScreenY = platform.y - cameraY;
+
+        // Cull platforms not visible vertically (basic)
+        if (platformScreenY + platform.height < 0 || platformScreenY > canvas.height) {
+            return;
+        }
+
+        for (let i = 0; i < platform.numBricks; i++) {
+            // Calculate screen X for each brick
+            const brickWorldX = platform.x + i * brickSize;
+            const brickScreenX = brickWorldX - cameraX;
+
+            // Cull individual bricks not visible horizontally
+            if (brickScreenX + brickSize < 0 || brickScreenX > canvas.width) {
+                continue;
+            }
+
+            const brickImageKey = platform.brickPattern[i];
+            const brickImage = images[brickImageKey];
+
+            if (brickImage && brickImage.complete && brickImage.naturalHeight > 0) {
+                ctx.drawImage(brickImage, brickScreenX, platformScreenY, brickSize, brickSize);
+            } else {
+                // Fallback for missing/unloaded brick
+                ctx.fillStyle = '#777'; // Darker grey fallback
+                ctx.fillRect(brickScreenX, platformScreenY, brickSize, brickSize);
+            }
+        }
     });
 }
 
-function updateWorld() {
-    // *** ADDED: Background scrolling logic ***
-    if (bgImageWidth > 0) { // Only scroll if width is calculated
-        bgX -= scrollSpeed;
-        if (bgX <= -bgImageWidth) {
-            bgX += bgImageWidth;
-        }
-    }
 
-    platforms.forEach(platform => {
-        platform.x -= scrollSpeed;
-    });
+function updateCamera() {
+    // Camera tries to keep player in the middle-left third of the screen.
+    const targetCameraX = player.x - canvas.width / 3;
+
+    // Smooth camera movement (optional, can just do cameraX = targetCameraX for instant)
+    // cameraX += (targetCameraX - cameraX) * 0.1; // Smoothing factor
+
+    cameraX = targetCameraX; // For now, instant camera
+
+    // Prevent camera from scrolling too far left (e.g., beyond world origin 0)
+    if (cameraX < 0) {
+        cameraX = 0;
+    }
+    // No right limit for an endless world for now.
+    // cameraY remains 0 for this implementation
+}
+
+
+function updateWorld() { // This function now mostly handles platform generation/removal
+    // Remove off-screen platforms (relative to camera)
     for (let i = platforms.length - 1; i >= 0; i--) {
-        if (platforms[i].x + platforms[i].width < 0) {
+        if (platforms[i].x + platforms[i].width < cameraX - 50) { // -50 buffer
             platforms.splice(i, 1);
         }
     }
+
+    // Update lastPlatformEndX based on current platforms (if any)
     if (platforms.length > 0) {
-        lastPlatformEndX = Math.max(...platforms.map(p => p.x + p.width));
-    } else {
-        lastPlatformEndX = 0;
+        // Find the maximum end X of existing platforms, or default to camera's right edge
+        let maxEndX = 0;
+        for(let i=0; i<platforms.length; i++){
+            if(platforms[i].x + platforms[i].width > maxEndX){
+                maxEndX = platforms[i].x + platforms[i].width;
+            }
+        }
+        lastPlatformEndX = Math.max(lastPlatformEndX, maxEndX); // Ensure it doesn't go backwards
+    } else { // No platforms exist, player might be falling, generate near player
+        lastPlatformEndX = player.x; // Or cameraX + some offset
     }
-    if (lastPlatformEndX < canvas.width + 200) {
+
+
+    // Generate new platforms if the rightmost generated platform is getting close to the camera's right edge
+    if (lastPlatformEndX < cameraX + canvas.width + 200) { // 200px buffer beyond screen right
         generateNewPlatform();
     }
 }
 
 function updatePlayer() {
+    // Horizontal movement
     if (keys.left) {
         player.dx = -playerSpeed;
         player.facingDirection = 'left';
@@ -218,10 +320,22 @@ function updatePlayer() {
     } else {
         player.dx = 0;
     }
-    player.x += player.dx;
+    player.x += player.dx; // Update player's world X
+
+    // Prevent player from moving beyond camera's left edge if camera is at 0
+    if (cameraX <= 0 && player.x < 0) {
+        player.x = 0;
+    }
+    // More generally, if player.x - cameraX < 0, means player is at screen left edge
+    // If player.x - cameraX < 0 (player's left edge relative to screen)
+    // player.x = cameraX; // Pushes player to stay on screen
+
+    // Apply gravity
     player.dy += gravity;
-    player.y += player.dy;
+    player.y += player.dy; // Update player's world Y
     player.onGround = false;
+
+    // Collision detection with platforms (uses world coordinates)
     platforms.forEach(platform => {
         if (
             player.x < platform.x + platform.width &&
@@ -234,17 +348,20 @@ function updatePlayer() {
                 player.dy = 0;
                 player.onGround = true;
                 player.jumpCount = 0;
-            } else if (player.dx > 0 && player.x + player.width - player.dx < platform.x) {
+            }
+            // Side collision (simplified, can be improved)
+            else if (player.dx > 0 && (player.x + player.width - player.dx) < platform.x && (player.y + player.height) > platform.y && player.y < platform.y + platform.height) {
                 player.x = platform.x - player.width;
                 if (!player.onGround) player.dx = 0;
-            } else if (player.dx < 0 && player.x - player.dx > platform.x + platform.width) {
+            } else if (player.dx < 0 && (player.x - player.dx) > (platform.x + platform.width) && (player.y + player.height) > platform.y && player.y < platform.y + platform.height) {
                 player.x = platform.x + platform.width;
                 if (!player.onGround) player.dx = 0;
             }
         }
     });
+
+    // Jumping
     if (keys.up && (player.onGround || player.jumpCount < player.maxJumps)) {
-        if (player.jumpCount === 0 && !player.onGround) {}
         player.dy = -jumpForce;
         player.onGround = false;
         player.jumpCount++;
@@ -258,6 +375,8 @@ function updatePlayer() {
             }
         }
     }
+
+    // Update Animation
     if (!player.onGround) {
         player.currentImage = images.jump;
     } else {
@@ -273,24 +392,28 @@ function updatePlayer() {
             player.walkFrameTimer = 0;
         }
     }
-    if (player.x < 0) player.x = 0;
-    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-    if (player.y > canvas.height) {
+
+    // If player falls off the bottom (relative to some logical "floor" or just far down)
+    // For an endless world, "falling off" means player.y is too far below the typical platform generation Y range.
+    if (player.y > canvas.height + 200) { // Significantly below the typical viewport bottom
         resetGame();
     }
 }
 
 function resetGame() {
     player.x = 50;
-    player.y = canvas.height - (player.height + 50);
+    player.y = canvas.height - (player.height + 50); // Initial world position
     player.dx = 0;
     player.dy = 0;
     player.onGround = false;
     player.jumpCount = 0;
     player.facingDirection = 'right';
     player.currentImage = images.stand;
-    // *** ADDED: Reset bgX on game reset ***
-    bgX = 0;
+
+    cameraX = 0; // Reset camera
+    cameraY = 0;
+    lastPlatformEndX = 0; // Reset for platform generation
+
     generateInitialPlatforms();
 }
 
@@ -300,13 +423,16 @@ function clearCanvas() {
 
 function gameLoop() {
     clearCanvas();
-    updateWorld();
-    updatePlayer();
 
-    // *** ADDED: Call to drawBackground ***
+    updatePlayer(); // Update player logic first (to get new player.x for camera)
+    updateCamera(); // Update camera based on new player position
+    updateWorld();  // Update world (platform gen/removal) based on new camera position
+
     drawBackground();
     drawPlatforms();
     drawPlayer();
 
     requestAnimationFrame(gameLoop);
 }
+
+console.log("Script setup complete. Waiting for images to load...");
