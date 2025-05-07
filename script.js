@@ -65,7 +65,10 @@ const player = {
     walkFrameTimer: 0,
     walkAnimationSpeed: 8, // Change walk frame every X game frames
 };
-
+// Background Scrolling
+let bgX = 0;
+let bgImageWidth = 0; // Will be calculated based on canvas height and aspect ratio
+const BG_ASPECT_RATIO = 3 / 1; // Given as 3:1
 function initializePlayerSprite() {
     player.currentImage = images.stand; // Default starting image
     // You might want to adjust player.y based on the initial sprite's height
