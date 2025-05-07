@@ -1,0 +1,23 @@
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    border: 2px solid #333;
+    background-color: #87CEEB; /* Sky blue background */
+    display: block; /* Removes extra space below canvas */
+    margin-top: 20px;
+}
+
+p {
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: #555;
+}
