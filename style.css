@@ -1,0 +1,143 @@
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Orbitron', sans-serif; /* Sci-fi/modern font */
+    background: linear-gradient(to bottom, #141e30, #243b55); /* Dark blue gradient */
+    color: #e0e0e0; /* Light grey text for contrast */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    text-align: center;
+}
+
+.page-wrapper {
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent dark overlay */
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    max-width: 900px; /* Controls the overall width of the content area */
+}
+
+.game-header h1 {
+    font-family: 'Press Start 2P', cursive; /* Pixel game font */
+    color: #00ffdd; /* Bright cyan/teal */
+    font-size: 2.2em;
+    margin-bottom: 25px;
+    text-shadow: 0 0 5px #00ffdd, 0 0 10px #00ffdd, 0 0 15px #00c5ab; /* Neon glow effect */
+}
+
+.game-content {
+    margin-bottom: 30px;
+}
+
+.canvas-container {
+    margin-bottom: 30px;
+    display: inline-block; /* Helps with centering and shadow */
+    border-radius: 8px; /* Match canvas border if needed */
+    box-shadow: 0 0 20px rgba(0, 255, 221, 0.3); /* Subtle glow around canvas */
+}
+
+canvas {
+    border: 3px solid #00ffdd; /* Bright cyan border */
+    background-color: #87CEEB; /* This is from your game script, keep it consistent */
+    display: block; /* Remove extra space below */
+    max-width: 100%; /* Make canvas responsive within its container */
+    border-radius: 6px; /* Slightly rounded corners for the canvas itself */
+}
+
+.controls-section {
+    background-color: rgba(20, 30, 48, 0.6); /* Dark, slightly transparent background */
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #00aaff; /* Lighter blue border */
+    max-width: 450px;
+    margin: 0 auto; /* Center the controls section */
+}
+
+.controls-section h2 {
+    font-family: 'Press Start 2P', cursive;
+    color: #f0ad4e; /* Contrasting orange for "Controls" title */
+    font-size: 1.3em;
+    margin-bottom: 15px;
+}
+
+.controls-list {
+    list-style: none;
+    padding: 0;
+}
+
+.controls-list li {
+    margin-bottom: 10px;
+    font-size: 1em;
+    color: #c0c0c0; /* Slightly lighter text for readability */
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Center items if you want them stacked or adjust for side-by-side */
+}
+
+.key-display {
+    display: inline-block;
+    background-color: #e0e0e0;
+    color: #141e30; /* Dark text on light key */
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-right: 10px;
+    font-weight: bold;
+    min-width: 30px;
+    text-align: center;
+    box-shadow: 0 2px 0 #a0a0a0; /* Simple 3D effect for keys */
+    transition: all 0.1s ease-in-out;
+}
+
+.key-display:hover {
+    background-color: #f0ad4e;
+    color: #fff;
+}
+
+.game-footer {
+    margin-top: 20px; /* Pushes footer slightly down */
+    padding-top: 15px;
+    font-size: 0.8em;
+    color: #7f8c8d; /* Muted color for footer text */
+    border-top: 1px dashed #34495e; /* Subtle separator */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .game-header h1 {
+        font-size: 1.8em;
+    }
+    .controls-section h2 {
+        font-size: 1.1em;
+    }
+    .page-wrapper {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .game-header h1 {
+        font-size: 1.5em;
+    }
+    .controls-list li {
+        font-size: 0.9em;
+        flex-direction: column; /* Stack key and text on very small screens */
+        margin-bottom: 15px;
+    }
+    .key-display {
+        margin-right: 0;
+        margin-bottom: 5px;
+    }
+    .page-wrapper {
+        padding: 15px;
+    }
+}
