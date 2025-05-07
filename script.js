@@ -6,7 +6,7 @@ canvas.width = 800;
 canvas.height = 400;
 
 const gravity = 0.5;
-const jumpForce = 9;
+const jumpForce = 11;
 const playerSpeed = 5;
 // const scrollSpeed = 1; // REMOVED - Replaced by camera movement
 const PLAYER_SPRITE_SCALE = 0.25;
