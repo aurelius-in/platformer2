@@ -6,10 +6,10 @@ canvas.width = 800;
 canvas.height = 400;
 
 const gravity = 0.5;
-const jumpForce = 9; // Adjusted for potentially taller sprite
+const jumpForce = 9; // Adjusted
 const playerSpeed = 5;
 const scrollSpeed = 1;
-const PLAYER_SPRITE_SCALE = 0.25; // To make the sprite 1/4 of its natural size
+const PLAYER_SPRITE_SCALE = 0.25;
 
 // Image Loading
 const images = {
@@ -17,67 +17,74 @@ const images = {
     walk1: new Image(),
     walk2: new Image(),
     jump: new Image(),
-    background: new Image() // Add background image object
+    background: new Image()
 };
 const imageSources = {
     stand: 'assets/robot_stand.png',
     walk1: 'assets/robot_walk_pos_1.png',
     walk2: 'assets/robot_walk_pos_2.png',
     jump: 'assets/robot_jump.png',
-    background: 'assets/platform_bg.png' // Add background image source
+    background: 'assets/platform_bg.png'
 };
 
 let imagesToLoad = Object.keys(imageSources).length;
 let imagesActuallyLoaded = 0;
 
+// Background Scrolling Variables
+let bgX = 0;
+let bgImageWidth = 0;
+const BG_ASPECT_RATIO = 3 / 1;
+
 function onImageLoad() {
     imagesActuallyLoaded++;
     if (imagesActuallyLoaded === imagesToLoad) {
-        // All images loaded, now we can initialize player and start game
+        // *** ADDED: Calculate bgImageWidth here ***
+        if (images.background.complete && images.background.naturalHeight > 0) {
+            bgImageWidth = canvas.height * BG_ASPECT_RATIO;
+        } else {
+            // Fallback or error if background image didn't load its dimensions properly
+            console.error("Background image dimensions not available for calculating width.");
+            bgImageWidth = canvas.width; // A fallback, though not ideal for 3:1 ratio
+        }
+
         initializePlayerSprite();
         generateInitialPlatforms();
-        gameLoop(); // Start the game loop
+        gameLoop();
     }
 }
 
 for (const key in imageSources) {
     images[key].onload = onImageLoad;
     images[key].src = imageSources[key];
-    images[key].onerror = () => console.error(`Failed to load image: ${imageSources[key]}`);
+    images[key].onerror = () => {
+        console.error(`Failed to load image: ${imageSources[key]}`);
+        // Call onImageLoad anyway to not stall the game if one image fails,
+        // but background might be missing or fallback might be used.
+        onImageLoad();
+    }
 }
 
-
-// Player
 const player = {
     x: 50,
-    y: canvas.height - 70, // Initial y
-    // Collision hitbox dimensions (adjust these to fit your robot's core body)
-    width: 35, // Example: Adjust based on robot_stand.png's perceived width
-    height: 55, // Example: Adjust based on robot_stand.png's perceived height
+    y: canvas.height - 70,
+    width: 35,
+    height: 55,
     dx: 0,
     dy: 0,
     onGround: false,
     jumpCount: 0,
     maxJumps: 2,
-    // Animation properties
-    facingDirection: 'right', // 'left' or 'right'
-    currentImage: null, // Will be set to one of the loaded images
-    walkFrame: 0, // To cycle between walk1 and walk2
+    facingDirection: 'right',
+    currentImage: null,
+    walkFrame: 0,
     walkFrameTimer: 0,
-    walkAnimationSpeed: 8, // Change walk frame every X game frames
+    walkAnimationSpeed: 8,
 };
-// Background Scrolling
-let bgX = 0;
-let bgImageWidth = 0; // Will be calculated based on canvas height and aspect ratio
-const BG_ASPECT_RATIO = 3 / 1; // Given as 3:1
+
 function initializePlayerSprite() {
-    player.currentImage = images.stand; // Default starting image
-    // You might want to adjust player.y based on the initial sprite's height
-    // For now, we assume player.y and player.height define the collision box bottom correctly
+    player.currentImage = images.stand;
 }
 
-
-// Platform settings (same as before)
 const platformHeight = 20;
 const minPlatformWidthBlocks = 2;
 const maxPlatformWidthBlocks = 12;
@@ -86,7 +93,6 @@ const maxPlatformGap = 150;
 const minPlatformY = canvas.height - 150;
 const maxPlatformY = canvas.height - 40;
 let lastPlatformEndX = 0;
-
 const platforms = [];
 
 function generateInitialPlatforms() {
@@ -134,47 +140,39 @@ document.addEventListener('keyup', (e) => {
     if (e.key === 'ArrowUp') keys.up = false;
 });
 
+// *** ADDED: drawBackground function ***
+function drawBackground() {
+    if (!images.background.complete || images.background.naturalHeight === 0 || bgImageWidth === 0) {
+        // Background image not ready, invalid, or width not calculated
+        // Draw solid blue as fallback if canvas has blue, or clear to canvas default
+        // The canvas already has a blue background from CSS, so clearRect will show it.
+        return;
+    }
+    ctx.drawImage(images.background, bgX, 0, bgImageWidth, canvas.height);
+    ctx.drawImage(images.background, bgX + bgImageWidth, 0, bgImageWidth, canvas.height);
+}
+
 function drawPlayer() {
     if (!player.currentImage || !player.currentImage.complete || player.currentImage.naturalHeight === 0) {
-        // Image not loaded or invalid, draw fallback rectangle
-        ctx.fillStyle = 'purple'; // Fallback color
+        ctx.fillStyle = 'purple';
         ctx.fillRect(player.x, player.y, player.width, player.height);
         return;
     }
-
-    ctx.save(); // Save the current canvas state
-
+    ctx.save();
     const img = player.currentImage;
-    // Calculate the new scaled dimensions for drawing
     const scaledSpriteWidth = img.naturalWidth * PLAYER_SPRITE_SCALE;
     const scaledSpriteHeight = img.naturalHeight * PLAYER_SPRITE_SCALE;
-
-    // Calculate draw position to align the SCALED sprite's bottom 
-    // with the collision box bottom, and the SCALED sprite's horizontal center 
-    // with the collision box's horizontal center.
-    // player.x, player.y is the top-left of the collision box.
     const drawX = player.x + (player.width / 2) - (scaledSpriteWidth / 2);
     const drawY = player.y + player.height - scaledSpriteHeight;
-
     if (player.facingDirection === 'right') {
-        // To flip around the center of the SCALED sprite:
-        // 1. Translate to the SCALED sprite's center point
-        // 2. Scale
-        // 3. Draw the image offset by half its SCALED width/height
         ctx.translate(drawX + scaledSpriteWidth / 2, drawY + scaledSpriteHeight / 2);
-        ctx.scale(-1, 1); // Flip horizontally
+        ctx.scale(-1, 1);
         ctx.drawImage(img, -scaledSpriteWidth / 2, -scaledSpriteHeight / 2, scaledSpriteWidth, scaledSpriteHeight);
-    } else { // Facing left (images are default left)
+    } else {
         ctx.drawImage(img, drawX, drawY, scaledSpriteWidth, scaledSpriteHeight);
     }
-
-    ctx.restore(); // Restore canvas state
-
-    // Optional: Draw collision box for debugging
-    // ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-    // ctx.strokeRect(player.x, player.y, player.width, player.height);
+    ctx.restore();
 }
-
 
 function drawPlatforms() {
     platforms.forEach(platform => {
@@ -184,6 +182,14 @@ function drawPlatforms() {
 }
 
 function updateWorld() {
+    // *** ADDED: Background scrolling logic ***
+    if (bgImageWidth > 0) { // Only scroll if width is calculated
+        bgX -= scrollSpeed;
+        if (bgX <= -bgImageWidth) {
+            bgX += bgImageWidth;
+        }
+    }
+
     platforms.forEach(platform => {
         platform.x -= scrollSpeed;
     });
@@ -203,7 +209,6 @@ function updateWorld() {
 }
 
 function updatePlayer() {
-    // Determine facing direction
     if (keys.left) {
         player.dx = -playerSpeed;
         player.facingDirection = 'left';
@@ -214,11 +219,9 @@ function updatePlayer() {
         player.dx = 0;
     }
     player.x += player.dx;
-
     player.dy += gravity;
     player.y += player.dy;
     player.onGround = false;
-
     platforms.forEach(platform => {
         if (
             player.x < platform.x + platform.width &&
@@ -231,59 +234,45 @@ function updatePlayer() {
                 player.dy = 0;
                 player.onGround = true;
                 player.jumpCount = 0;
-            }
-            // Basic side collision (can be improved)
-            else if (player.dx > 0 && player.x + player.width - player.dx < platform.x) {
+            } else if (player.dx > 0 && player.x + player.width - player.dx < platform.x) {
                 player.x = platform.x - player.width;
-                 if (!player.onGround) player.dx = 0; // Stop horizontal movement if hitting wall mid-air
+                if (!player.onGround) player.dx = 0;
             } else if (player.dx < 0 && player.x - player.dx > platform.x + platform.width) {
                 player.x = platform.x + platform.width;
-                 if (!player.onGround) player.dx = 0; // Stop horizontal movement
+                if (!player.onGround) player.dx = 0;
             }
         }
     });
-
-// Jumping
     if (keys.up && (player.onGround || player.jumpCount < player.maxJumps)) {
-        if (player.jumpCount === 0 && !player.onGround) { /* Allow first jump if falling */ }
-        
-        player.dy = -jumpForce; // Apply vertical jump force
+        if (player.jumpCount === 0 && !player.onGround) {}
+        player.dy = -jumpForce;
         player.onGround = false;
         player.jumpCount++;
-        keys.up = false; // Consume the up key press to prevent continuous jumping if held
-
-        // Add horizontal momentum based on facing direction if player is currently still horizontally
-        // This gives a little push to help clear gaps when jumping from a standstill.
-        if (player.dx === 0) { // Only apply if not already moving due to left/right keys
-            const horizontalJumpNudge = playerSpeed * 0.55; // Adjust this multiplier (0.0 to 1.0+)
+        keys.up = false;
+        if (player.dx === 0) {
+            const horizontalJumpNudge = playerSpeed * 0.55;
             if (player.facingDirection === 'right') {
                 player.dx = horizontalJumpNudge;
-            } else { // Facing left
+            } else {
                 player.dx = -horizontalJumpNudge;
             }
         }
-        // If player.dx is already non-zero (because player is holding left/right),
-        // that existing horizontal speed will naturally carry them during the jump.
     }
-
-    // Update Animation
     if (!player.onGround) {
         player.currentImage = images.jump;
     } else {
-        if (player.dx !== 0) { // Walking
+        if (player.dx !== 0) {
             player.walkFrameTimer++;
             if (player.walkFrameTimer >= player.walkAnimationSpeed) {
                 player.walkFrameTimer = 0;
-                player.walkFrame = (player.walkFrame + 1) % 2; // Cycle 0 and 1
+                player.walkFrame = (player.walkFrame + 1) % 2;
             }
             player.currentImage = player.walkFrame === 0 ? images.walk1 : images.walk2;
-        } else { // Standing
+        } else {
             player.currentImage = images.stand;
-            player.walkFrameTimer = 0; // Reset walk timer when standing
+            player.walkFrameTimer = 0;
         }
     }
-
-
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     if (player.y > canvas.height) {
@@ -293,13 +282,15 @@ function updatePlayer() {
 
 function resetGame() {
     player.x = 50;
-    player.y = canvas.height - (player.height + 50); // Adjust y to be on platform
+    player.y = canvas.height - (player.height + 50);
     player.dx = 0;
     player.dy = 0;
     player.onGround = false;
     player.jumpCount = 0;
     player.facingDirection = 'right';
     player.currentImage = images.stand;
+    // *** ADDED: Reset bgX on game reset ***
+    bgX = 0;
     generateInitialPlatforms();
 }
 
@@ -307,15 +298,15 @@ function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function gameLoop() { // This will be called once images are loaded
+function gameLoop() {
     clearCanvas();
     updateWorld();
     updatePlayer();
+
+    // *** ADDED: Call to drawBackground ***
+    drawBackground();
     drawPlatforms();
     drawPlayer();
+
     requestAnimationFrame(gameLoop);
 }
-
-// Game doesn't start until images are loaded (see onImageLoad function)
-// generateInitialPlatforms(); // Moved to onImageLoad
-// gameLoop(); // Moved to onImageLoad
