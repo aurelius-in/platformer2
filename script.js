@@ -15,14 +15,17 @@ const images = {
     stand: new Image(),
     walk1: new Image(),
     walk2: new Image(),
-    jump: new Image()
+    jump: new Image(),
+    background: new Image() // Add background image object
 };
 const imageSources = {
-    stand: 'assets/robot_stand.png', // Make sure these paths are correct
+    stand: 'assets/robot_stand.png',
     walk1: 'assets/robot_walk_pos_1.png',
     walk2: 'assets/robot_walk_pos_2.png',
-    jump: 'assets/robot_jump.png'
+    jump: 'assets/robot_jump.png',
+    background: 'assets/platform_bg.png' // Add background image source
 };
+
 let imagesToLoad = Object.keys(imageSources).length;
 let imagesActuallyLoaded = 0;
 
