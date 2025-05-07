@@ -9,6 +9,7 @@ const gravity = 0.5;
 const jumpForce = 12; // Adjusted for potentially taller sprite
 const playerSpeed = 5;
 const scrollSpeed = 1;
+const PLAYER_SPRITE_SCALE = 0.25; // To make the sprite 1/4 of its natural size
 
 // Image Loading
 const images = {
@@ -144,28 +145,30 @@ function drawPlayer() {
     ctx.save(); // Save the current canvas state
 
     const img = player.currentImage;
-    const spriteActualWidth = img.naturalWidth;
-    const spriteActualHeight = img.naturalHeight;
+    // Calculate the new scaled dimensions for drawing
+    const scaledSpriteWidth = img.naturalWidth * PLAYER_SPRITE_SCALE;
+    const scaledSpriteHeight = img.naturalHeight * PLAYER_SPRITE_SCALE;
 
-    // Calculate draw position to align sprite bottom with collision box bottom,
-    // and sprite center with collision box center.
+    // Calculate draw position to align the SCALED sprite's bottom 
+    // with the collision box bottom, and the SCALED sprite's horizontal center 
+    // with the collision box's horizontal center.
     // player.x, player.y is the top-left of the collision box.
-    const drawX = player.x + (player.width / 2) - (spriteActualWidth / 2);
-    const drawY = player.y + player.height - spriteActualHeight;
+    const drawX = player.x + (player.width / 2) - (scaledSpriteWidth / 2);
+    const drawY = player.y + player.height - scaledSpriteHeight;
 
     if (player.facingDirection === 'right') {
-        // To flip around the center of the sprite:
-        // 1. Translate to the sprite's center point (relative to its drawX, drawY)
+        // To flip around the center of the SCALED sprite:
+        // 1. Translate to the SCALED sprite's center point
         // 2. Scale
-        // 3. Draw the image offset by half its width/height
-        ctx.translate(drawX + spriteActualWidth / 2, drawY + spriteActualHeight / 2);
+        // 3. Draw the image offset by half its SCALED width/height
+        ctx.translate(drawX + scaledSpriteWidth / 2, drawY + scaledSpriteHeight / 2);
         ctx.scale(-1, 1); // Flip horizontally
-        ctx.drawImage(img, -spriteActualWidth / 2, -spriteActualHeight / 2, spriteActualWidth, spriteActualHeight);
+        ctx.drawImage(img, -scaledSpriteWidth / 2, -scaledSpriteHeight / 2, scaledSpriteWidth, scaledSpriteHeight);
     } else { // Facing left (images are default left)
-        ctx.drawImage(img, drawX, drawY, spriteActualWidth, spriteActualHeight);
+        ctx.drawImage(img, drawX, drawY, scaledSpriteWidth, scaledSpriteHeight);
     }
 
-    ctx.restore(); // Restore canvas state to prevent flip affecting other drawings
+    ctx.restore(); // Restore canvas state
 
     // Optional: Draw collision box for debugging
     // ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
