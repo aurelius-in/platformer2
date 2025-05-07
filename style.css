@@ -24,7 +24,7 @@ body {
     border-radius: 12px;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
     width: 100%;
-    max-width: 900px; /* Controls the overall width of the content area */
+    max-width: 90vw; /* Controls the overall width of the content area */
 }
 
 .game-header h1 {
