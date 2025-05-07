@@ -6,7 +6,7 @@ canvas.width = 800;
 canvas.height = 400;
 
 const gravity = 0.5;
-const jumpForce = 12; // Adjusted for potentially taller sprite
+const jumpForce = 9; // Adjusted for potentially taller sprite
 const playerSpeed = 5;
 const scrollSpeed = 1;
 const PLAYER_SPRITE_SCALE = 0.25; // To make the sprite 1/4 of its natural size
@@ -243,12 +243,27 @@ function updatePlayer() {
         }
     });
 
+// Jumping
     if (keys.up && (player.onGround || player.jumpCount < player.maxJumps)) {
-        if (player.jumpCount === 0 && !player.onGround) {}
-        player.dy = -jumpForce;
+        if (player.jumpCount === 0 && !player.onGround) { /* Allow first jump if falling */ }
+        
+        player.dy = -jumpForce; // Apply vertical jump force
         player.onGround = false;
         player.jumpCount++;
-        keys.up = false;
+        keys.up = false; // Consume the up key press to prevent continuous jumping if held
+
+        // Add horizontal momentum based on facing direction if player is currently still horizontally
+        // This gives a little push to help clear gaps when jumping from a standstill.
+        if (player.dx === 0) { // Only apply if not already moving due to left/right keys
+            const horizontalJumpNudge = playerSpeed * 0.55; // Adjust this multiplier (0.0 to 1.0+)
+            if (player.facingDirection === 'right') {
+                player.dx = horizontalJumpNudge;
+            } else { // Facing left
+                player.dx = -horizontalJumpNudge;
+            }
+        }
+        // If player.dx is already non-zero (because player is holding left/right),
+        // that existing horizontal speed will naturally carry them during the jump.
     }
 
     // Update Animation
