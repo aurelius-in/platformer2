@@ -58,6 +58,11 @@ const imageSources = {
 // The rest of your image loading logic (imagesToLoad, imagesActuallyLoaded, onImageLoad, for loop)
 // will automatically pick these up.
 
+const backgroundSequence = []; // To hold the Image objects in order
+const backgroundScaledWidths = []; // To hold their calculated widths
+let totalBackgroundSequenceWidth = 0; // Total width of all 8 images side-by-side
+// let bgX = 0; // We'll keep this or a similar concept for the main drawing offset relative to the camera
+
 let imagesToLoad = Object.keys(imageSources).length;
 let imagesActuallyLoaded = 0;
 console.log("Total images to load:", imagesToLoad);
@@ -67,24 +72,41 @@ let cameraX = 0;
 let cameraY = 0; // We'll keep cameraY fixed at 0 for now (no vertical scrolling)
 
 // Background Scrolling Variables (relative to world)
-let bgImageWidth = 0;
-const BG_ASPECT_RATIO = 3 / 1;
+//let bgImageWidth = 0;
+// const BG_ASPECT_RATIO = 3 / 1;
 
 function onImageLoad(imageKey) {
     imagesActuallyLoaded++;
-    console.log(`Image loaded (${imageKey}). ${imagesActuallyLoaded}/${imagesToLoad} images loaded so far.`);
-    // console.log(`  Details for ${imageKey}: complete=${images[imageKey].complete}, naturalWidth=${images[imageKey].naturalWidth}, naturalHeight=${images[imageKey].naturalHeight}`);
+    // console.log(`Image loaded (${imageKey}). ${imagesActuallyLoaded}/${imagesToLoad} images loaded so far.`);
 
     if (imagesActuallyLoaded === imagesToLoad) {
         console.log("All images reported as loaded/processed.");
-        if (images.background.complete && images.background.naturalHeight > 0) {
-            bgImageWidth = canvas.height * BG_ASPECT_RATIO;
-            console.log("SUCCESS: Background image dimensions appear valid. Calculated bgImageWidth:", bgImageWidth);
-        } else {
-            console.error("ERROR: Background image not complete or naturalHeight is 0 when trying to calculate bgImageWidth.");
+
+        // Process background sequence
+        backgroundSequence.length = 0; // Clear previous if any (for resets)
+        backgroundScaledWidths.length = 0;
+        totalBackgroundSequenceWidth = 0;
+
+        for (let i = 1; i <= 8; i++) {
+            const bgKey = 'bg' + i;
+            const img = images[bgKey];
+            if (img && img.complete && img.naturalHeight > 0) {
+                backgroundSequence.push(img);
+                const scaledWidth = (img.naturalWidth / img.naturalHeight) * canvas.height;
+                backgroundScaledWidths.push(scaledWidth);
+                totalBackgroundSequenceWidth += scaledWidth;
+                console.log(`Background ${bgKey}: natural W/H: ${img.naturalWidth}/${img.naturalHeight}, scaledWidth: ${scaledWidth}`);
+            } else {
+                console.error(`Error processing background image: ${bgKey}. It might not have loaded correctly.`);
+                // You might want to push a placeholder or handle this error
+            }
         }
+        console.log("Total background sequence width:", totalBackgroundSequenceWidth);
+        console.log("Background scaled widths:", backgroundScaledWidths);
+
+
         initializePlayerSprite();
-        generateInitialPlatforms(); // Generate platforms based on initial cameraX (0)
+        generateInitialPlatforms();
         console.log("Starting gameLoop...");
         gameLoop();
     }
@@ -191,26 +213,86 @@ document.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') keys.le
 document.addEventListener('keyup', (e) => { if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false; if (e.key === 'ArrowUp') keys.up = false; });
 
 function drawBackground() {
-    if (!images.background.complete || images.background.naturalHeight === 0 || bgImageWidth <= 0) {
-        return;
-    }
-    // Calculate the starting X position for drawing the background based on cameraX
-    // This creates a seamless loop.
-    const parallaxFactor = 1; // Set to < 1 for slower background scroll (parallax)
-    let effectiveCameraX = cameraX * parallaxFactor;
-    let startX = -(effectiveCameraX % bgImageWidth);
-    if (startX > 0) { // Ensure startX is 0 or negative for proper looping from left
-        startX -= bgImageWidth;
+    if (backgroundSequence.length === 0 || totalBackgroundSequenceWidth <= 0) {
+        // console.log("Background sequence not ready or empty.");
+        return; // Nothing to draw if sequence isn't set up
     }
 
-    ctx.drawImage(images.background, startX, 0 - cameraY, bgImageWidth, canvas.height);
-    ctx.drawImage(images.background, startX + bgImageWidth, 0 - cameraY, bgImageWidth, canvas.height);
-    // Draw a third if necessary to cover screen during fast camera moves or very wide bgImageWidth
-    if (startX + bgImageWidth * 2 < canvas.width + effectiveCameraX ) { // Heuristic check
-         ctx.drawImage(images.background, startX + bgImageWidth * 2, 0 - cameraY, bgImageWidth, canvas.height);
+    const parallaxFactor = 1; // Set to < 1 for slower background scroll (true parallax)
+    let effectiveCameraX = cameraX * parallaxFactor;
+
+    // Calculate the starting X position for drawing the sequence based on cameraX,
+    // making it loop using the total width of the sequence.
+    let currentX = -(effectiveCameraX % totalBackgroundSequenceWidth);
+    
+    // If cameraX is positive and causes currentX to be positive from the modulo,
+    // adjust so we always start drawing from left (or off-screen left)
+    // This ensures that as cameraX increases (moves right), currentX becomes more negative.
+    if (currentX > 0 && effectiveCameraX > 0) {
+         currentX -= totalBackgroundSequenceWidth;
+    }
+    // If cameraX is negative (player moving left past origin), ensure currentX is positive
+    else if (currentX < -totalBackgroundSequenceWidth && effectiveCameraX < 0) {
+        currentX += totalBackgroundSequenceWidth;
+    }
+
+
+    // Keep drawing segments of the background until the screen is filled
+    // Draw the main sequence
+    let drawnX = currentX;
+    for (let i = 0; i < backgroundSequence.length; i++) {
+        const img = backgroundSequence[i];
+        const scaledWidth = backgroundScaledWidths[i];
+        if (img && img.complete && scaledWidth > 0) {
+            // Only draw if part of the image is on screen
+            if (drawnX < canvas.width && drawnX + scaledWidth > 0) {
+                 ctx.drawImage(img, Math.floor(drawnX), 0 - cameraY, Math.ceil(scaledWidth), canvas.height);
+            }
+            drawnX += scaledWidth;
+        } else {
+            // Skip if image is bad or width is zero
+            console.warn("Skipping draw for a background image in sequence due to issues.");
+        }
+    }
+
+    // Draw a second copy of the sequence if needed to fill the screen to the right
+    if (drawnX < canvas.width) { // If the first sequence didn't fill the screen width
+        let secondSequenceDrawX = drawnX; // Start where the first sequence ended
+        // (This is equivalent to currentX + totalBackgroundSequenceWidth if we didn't accumulate drawnX)
+        // Let's restart from the calculated start for the next loop instance
+        secondSequenceDrawX = currentX + totalBackgroundSequenceWidth;
+
+        for (let i = 0; i < backgroundSequence.length; i++) {
+            const img = backgroundSequence[i];
+            const scaledWidth = backgroundScaledWidths[i];
+            if (img && img.complete && scaledWidth > 0) {
+                 if (secondSequenceDrawX < canvas.width && secondSequenceDrawX + scaledWidth > 0) {
+                    ctx.drawImage(img, Math.floor(secondSequenceDrawX), 0 - cameraY, Math.ceil(scaledWidth), canvas.height);
+                }
+                secondSequenceDrawX += scaledWidth;
+                 if (secondSequenceDrawX >= canvas.width) break; // Stop if we've filled the screen
+            }
+        }
+    }
+    
+    // Potentially draw a third copy for very fast moves or large totalBackgroundSequenceWidth
+    // relative to canvas width to ensure no gaps if the start of the loop is far off screen.
+    // This might be needed if `currentX` is very negative.
+    if (currentX + totalBackgroundSequenceWidth * 2 < canvas.width && totalBackgroundSequenceWidth > 0) {
+        let thirdSequenceDrawX = currentX + totalBackgroundSequenceWidth * 2;
+        for (let i = 0; i < backgroundSequence.length; i++) {
+            const img = backgroundSequence[i];
+            const scaledWidth = backgroundScaledWidths[i];
+            if (img && img.complete && scaledWidth > 0) {
+                 if (thirdSequenceDrawX < canvas.width && thirdSequenceDrawX + scaledWidth > 0) {
+                    ctx.drawImage(img, Math.floor(thirdSequenceDrawX), 0 - cameraY, Math.ceil(scaledWidth), canvas.height);
+                }
+                thirdSequenceDrawX += scaledWidth;
+                 if (thirdSequenceDrawX >= canvas.width) break;
+            }
+        }
     }
 }
-
 function drawPlayer() {
     if (!player.currentImage || !player.currentImage.complete || player.currentImage.naturalHeight === 0) {
         ctx.fillStyle = 'purple';
